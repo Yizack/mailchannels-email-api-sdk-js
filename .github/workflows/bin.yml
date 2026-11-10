@@ -1,0 +1,81 @@
+name: bin
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build-cli-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v3
+        with:
+          runtime: node@lts
+          cache: true
+          
+      - name: Build Node Bundle
+        run: node --run build
+
+      - name: Build Binaries
+        run: |
+          pnpx @yao-pkg/pkg dist/cli/index.mjs --compress Brotli -t node24-macos-arm64 --output dist/mailchannels-darwin-arm64
+          pnpx @yao-pkg/pkg dist/cli/index.mjs --compress Brotli -t node24-macos-x64   --output dist/mailchannels-darwin-x64
+
+      - name: Package archives
+        run: |
+          cd dist
+          for bin in mailchannels-darwin-arm64 mailchannels-darwin-x64; do
+            cp "$bin" mailchannels
+            chmod +x mailchannels
+            tar -czf "${bin}.tar.gz" mailchannels
+            rm mailchannels
+          done
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-artifacts
+          path: |
+            dist/mailchannels-darwin-arm64.tar.gz
+            dist/mailchannels-darwin-x64.tar.gz
+
+  build-cli-linux-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v3
+        with:
+          runtime: node@lts
+          cache: true
+          
+      - name: Build Node Bundle
+        run: node --run build
+      
+      - name: Build Binaries
+        run: |
+          pnpx @yao-pkg/pkg dist/cli/index.mjs --compress Brotli -t node24-linux-x64   --output dist/mailchannels-linux-x64
+          pnpx @yao-pkg/pkg dist/cli/index.mjs --compress Brotli -t node24-linux-arm64 --output dist/mailchannels-linux-arm64 --no-bytecode --public-packages "*" --public
+          pnpx @yao-pkg/pkg dist/cli/index.mjs --compress Brotli -t node24-win-x64     --output dist/mailchannels-windows-x64.exe
+
+      - name: Package archives
+        run: |
+          cd dist
+          for bin in mailchannels-linux-x64 mailchannels-linux-arm64; do
+            cp "$bin" mailchannels
+            chmod +x mailchannels
+            tar -czf "${bin}.tar.gz" mailchannels
+            rm mailchannels
+          done
+          cp mailchannels-windows-x64.exe mailchannels.exe
+          zip mailchannels-windows-x64.zip mailchannels.exe
+          rm mailchannels.exe
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: mailchannels-linux-windows
+          path: |
+            dist/mailchannels-linux-x64.tar.gz
+            dist/mailchannels-linux-arm64.tar.gz
+            dist/mailchannels-windows-x64.zip
